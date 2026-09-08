@@ -107,8 +107,10 @@ Panel {
     return root.lowColor
   }
 
+  // A speech or a hearing carries no numbers, and a blank column reads as a
+  // broken widget rather than as an event with nothing to print.
   function figures(event) {
-    if (event.forecast === "" && event.previous === "") return ""
+    if (event.forecast === "" && event.previous === "") return "no figures"
     return "f " + (event.forecast === "" ? "–" : event.forecast)
       + "   p " + (event.previous === "" ? "–" : event.previous)
   }
