@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Today's FX session windows and G10 economic calendar, as one JSON blob.
+
+Runnable on its own:  bin/fx-brief | jq
+The QML side only draws what this prints; every fact about time lives here,
+where zoneinfo knows the DST rules.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+import urllib.request
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+FEED = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+CACHE = os.environ.get(
+    "FX_BRIEF_CACHE", os.path.expanduser("~/.cache/omarchy-fxdesk/thisweek.json")
+)
+
+# ponytail: the conventional session windows, wall clock in each centre. Desks
+# disagree about Sydney (07-16 vs 08-17) and whether Tokyo shuts at 17 or 18.
+# This table is the only knob; edit it rather than adding a settings surface.
+SESSIONS = [
+    ("SYD", "Sydney", "Australia/Sydney", 8, 17),
+    ("TKY", "Tokyo", "Asia/Tokyo", 9, 18),
+    ("LDN", "London", "Europe/London", 8, 17),
+    ("NY", "New York", "America/New_York", 8, 17),
+]
+
+G10 = "USD,EUR,JPY,GBP,CHF,AUD,NZD,CAD,SEK,NOK"
+
+
+def load_calendar(max_age):
+    """The feed is weekly, so a cache hit is the normal path. A fetch that fails
+    falls back to the last good copy rather than blanking the panel."""
+    cached = os.path.exists(CACHE)
+    if cached and time.time() - os.path.getmtime(CACHE) < max_age:
+        try:
+            with open(CACHE) as f:
+                return json.load(f), ""
+        except Exception:
+            pass  # a truncated cache is just a cache miss
+
+    # The feed 403s the default python-urllib agent, so it gets named here.
+    request = urllib.request.Request(FEED, headers={"User-Agent": "omarchy-fxdesk/0.1"})
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            raw = response.read()
+        rows = json.loads(raw)
+        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+        tmp = CACHE + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(raw)
+        os.replace(tmp, CACHE)
+        return rows, ""
+    except Exception as error:
+        if cached:
+            try:
+                with open(CACHE) as f:
+                    return json.load(f), "showing cached calendar: %s" % error
+            except Exception:
+                pass
+        return [], "calendar unavailable: %s" % error
+
+
+def session_windows(days=5):
+    """Every open-to-close window from yesterday forward, so a window running
+    across our local midnight is still in the list. Saturday and Sunday have
+    none: the market is shut, whatever the clock says."""
+    out = []
+    for code, name, tzname, open_hour, close_hour in SESSIONS:
+        tz = ZoneInfo(tzname)
+        start = datetime.now(tz).date() - timedelta(days=1)
+        windows = []
+        for offset in range(days + 1):
+            day = start + timedelta(days=offset)
+            if day.weekday() >= 5:
+                continue
+            opens = datetime(day.year, day.month, day.day, open_hour, tzinfo=tz)
+            closes = datetime(day.year, day.month, day.day, close_hour, tzinfo=tz)
+            windows.append({"open": int(opens.timestamp()), "close": int(closes.timestamp())})
+        out.append({"code": code, "name": name, "tz": tzname, "windows": windows})
+    return out
+
+
+def todays_events(rows, currencies, impacts):
+    local = datetime.now().astimezone().tzinfo
+    today = datetime.now(local).date()
+    out = []
+    for row in rows:
+        if row.get("country") not in currencies or row.get("impact") not in impacts:
+            continue
+        try:
+            at = datetime.fromisoformat(row["date"])
+        except (KeyError, ValueError):
+            continue
+        if at.astimezone(local).date() != today:
+            continue
+        out.append(
+            {
+                "at": int(at.timestamp()),
+                "ccy": row["country"],
+                "impact": row["impact"],
+                "title": row.get("title", ""),
+                "forecast": row.get("forecast", ""),
+                "previous": row.get("previous", ""),
+            }
+        )
+    out.sort(key=lambda event: event["at"])
+    return out
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--ccy", default=G10, help="comma-separated currencies to keep")
+    parser.add_argument("--impact", default="High,Medium", help="comma-separated impact levels")
+    parser.add_argument("--max-age", type=int, default=3600, help="seconds before the feed is refetched")
+    args = parser.parse_args()
+
+    currencies = {c.strip().upper() for c in args.ccy.split(",") if c.strip()}
+    impacts = {i.strip().title() for i in args.impact.split(",") if i.strip()}
+
+    rows, error = load_calendar(args.max_age)
+    json.dump(
+        {
+            "now": int(time.time()),
+            "sessions": session_windows(),
+            "events": todays_events(rows, currencies, impacts),
+            "error": error,
+        },
+        sys.stdout,
+    )
+    sys.stdout.write("\n")
+
+
+if __name__ == "__main__":
+    main()
