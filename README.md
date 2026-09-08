@@ -1,5 +1,7 @@
 # FX Desk
 
+![FX Desk in the Omarchy bar](preview.png)
+
 An Omarchy bar widget for FX traders: which sessions are open right now, when
 the next one turns over, and every major G10 release due today.
 
