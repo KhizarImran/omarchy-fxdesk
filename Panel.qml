@@ -556,7 +556,7 @@ Panel {
             width: parent.width
             leftPadding: Style.space(10)
             topPadding: Style.space(2)
-            text: "f forecast · p previous · r refresh"
+            text: "r refresh"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption

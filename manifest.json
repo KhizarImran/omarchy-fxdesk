@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "khizarimran.fxdesk",
   "name": "FX Desk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "@khzrimrn",
   "license": "MIT",
   "description": "FX session clock and today's major G10 economic releases in the Omarchy bar.",
