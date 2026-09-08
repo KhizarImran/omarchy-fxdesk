@@ -5,8 +5,9 @@
 An Omarchy bar widget for FX traders: which sessions are open right now, when
 the next one turns over, and every major G10 release due today.
 
-The bar pill reads `LDN+NY · USD 28m` — the sessions currently open, and the
-next release with its countdown when one is due within twelve hours. Click it
+The bar pill reads `LDN+NY · USD` — the sessions currently open, and the
+currency of the next release when one is due within twelve hours. No clock
+ticks in your bar; hover for the countdown. Click it
 for the panel: a dot-matrix world map with the four centres lighting up as they
 open, today's session windows laid against a local midnight-to-midnight strip
 with a line on now, then the session countdowns and today's releases.
